@@ -1,0 +1,9 @@
+name = "rat-road-leaderboard"
+main = "leaderboard.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for scores — id filled in after:
+#   npx wrangler kv namespace create SCORES
+[[kv_namespaces]]
+binding = "SCORES"
+id = "b8b2c9da591d4408b6e670866743a70f"
