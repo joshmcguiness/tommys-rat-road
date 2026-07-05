@@ -20,3 +20,5 @@ Every 100 jumps the rat dives into a sewer and the next level runs 10% faster.
 
 - **Game:** GitHub Pages serves `index.html` from the `main` branch.
 - **Leaderboard:** `cd worker && npx wrangler deploy`
+
+_build: widescreen v2 — 2026-07-06 07:39_
