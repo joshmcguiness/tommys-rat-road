@@ -16,8 +16,11 @@ export default {
       return new Response('Not found', { status: 404, headers: CORS });
     }
 
+    // separate boards per game: default key 'top' (Rat Road), 'top-berry' (Blueberry Dash)
+    const board = url.searchParams.get('board') === 'berry' ? 'top-berry' : 'top';
+
     if (req.method === 'GET') {
-      const top = JSON.parse((await env.SCORES.get('top')) || '[]');
+      const top = JSON.parse((await env.SCORES.get(board)) || '[]');
       return Response.json(top.slice(0, 20), { headers: CORS });
     }
 
@@ -33,12 +36,12 @@ export default {
         return new Response('Invalid score', { status: 400, headers: CORS });
       }
 
-      const top = JSON.parse((await env.SCORES.get('top')) || '[]');
+      const top = JSON.parse((await env.SCORES.get(board)) || '[]');
       const entry = { name, score, level, ts: Date.now() };
       top.push(entry);
       top.sort((a, b) => b.score - a.score || a.ts - b.ts);
       const trimmed = top.slice(0, 50);
-      await env.SCORES.put('top', JSON.stringify(trimmed));
+      await env.SCORES.put(board, JSON.stringify(trimmed));
       const rank = trimmed.findIndex(e => e.ts === entry.ts && e.name === name) + 1;
       return Response.json({ ok: true, rank: rank || null, top: trimmed.slice(0, 20) }, { headers: CORS });
     }
