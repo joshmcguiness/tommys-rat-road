@@ -178,6 +178,7 @@ const sfx = {
   bell:   () => { beep(1250, .09, 'square', .05); setTimeout(() => beep(1250, .11, 'square', .05), 110); },
   fling:  () => beep(180, .55, 'sine', .1, 900),
   sewer:  () => { beep(500, .3, 'sine', .08, 130); setTimeout(() => beep(160, .35, 'square', .07, 720), 500); },
+  rainbow:() => { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, .14, 'square', .06), i * 70)); },
   unlock: () => { [523,659,784,1047].forEach((f,i) => setTimeout(() => beep(f,.12,'square',.06), i*90)); },
 };
 
@@ -213,6 +214,7 @@ function rr(x, y, w, h, r) { // rounded rect path
 let state = 'menu'; // menu | play | dying | sewer
 let rows, player, camR, camSpeed, score, runCheese, deathTimer, deathType, hawk, idleTime, time;
 let level, speedMul, pendingSewer, sewerT;
+let invT = 0, nextRainbowAt = 20; // rainbow cheese invincibility
 
 function makeRow(r) {
   // decide type based on previous rows
@@ -273,7 +275,7 @@ function makeRow(r) {
     row.cars = [];
     row.cheese = new Set();
     const loop = W + 520;
-    const n = randi(3, 4);
+    const n = randi(2, 3);
     let x = rand(0, 150);
     for (let i = 0; i < n; i++) {
       const truck = Math.random() < .22;
@@ -326,6 +328,7 @@ function reset() {
   camR = -4.2; camSpeed = .38; camX = W / 2;
   score = 0; runCheese = 0; idleTime = 0; time = 0;
   level = 1; speedMul = 1; pendingSewer = false; sewerT = 0;
+  invT = 0; nextRainbowAt = 20;
   hawk = null; deathTimer = 0; deathType = '';
   queue.length = 0;
 }
@@ -475,9 +478,14 @@ function update(dt) {
       }
       // cheese pickup on landing
       const row = rows.get(p.r);
-      if (row && row.cheese) {
-        const c = Math.round(p.px / TILE - .5);
-        if (row.cheese.has(c)) { row.cheese.delete(c); runCheese++; sfx.cheese(); }
+      const col = Math.round(p.px / TILE - .5);
+      if (row && row.cheese && row.cheese.has(col)) {
+        row.cheese.delete(col); runCheese++; sfx.cheese();
+        if (runCheese >= nextRainbowAt) { nextRainbowAt += 20; spawnRainbow(); }
+      }
+      if (row && row.rainbow === col) {
+        delete row.rainbow;
+        invT = 10; sfx.rainbow();
       }
       // dive into the sewer on the first dry landing past the threshold
       if (pendingSewer && row && row.type !== 'river') { pendingSewer = false; startSewer(); return; }
@@ -491,6 +499,9 @@ function update(dt) {
     if (queue.length) startHop(queue.shift());
     p.fr = p.r;
   }
+
+  // rainbow-cheese invincibility (water and falling behind still count)
+  if (invT > 0) { invT -= dt; idleTime = 0; }
 
   // river logic (only when settled)
   const curRow = rows.get(p.r);
@@ -511,13 +522,13 @@ function update(dt) {
   // car collision (against float row)
   const nearR = Math.round(p.fr);
   const rowC = rows.get(nearR);
-  if (rowC && rowC.type === 'road') {
+  if (rowC && rowC.type === 'road' && invT <= 0) {
     for (const c of rowC.cars) {
       const cx = carScreenX(rowC, c);
       if (p.px + 15 > cx && p.px - 15 < cx + c.len) { kill('car'); return; }
     }
   }
-  if (rowC && rowC.type === 'rail' && rowC.state === 'train') {
+  if (rowC && rowC.type === 'rail' && rowC.state === 'train' && invT <= 0) {
     const tx = rowC.trainX, tl = TILE * 3.2;
     const a = rowC.trainDir === 1 ? tx - tl : tx, b = rowC.trainDir === 1 ? tx : tx + tl;
     if (p.px + 14 > a && p.px - 14 < b) { flingPlayer(); return; }
@@ -537,6 +548,21 @@ function update(dt) {
 }
 
 function spawnHawk() { const a = projP(player.px, zOf(player.fr) + TILE * .5, 30); hawk = { x: a.x, y: a.y }; }
+
+function spawnRainbow() {
+  // drop a rainbow cheese on a walkable cell a few rows ahead
+  for (let r = player.r + 4; r <= player.r + 12; r++) {
+    genRowsUpTo(r);
+    const row = rows.get(r);
+    if (!row || (row.type !== 'grass' && row.type !== 'road')) continue;
+    const free = [];
+    for (let c = 0; c < COLS; c++) if (!(row.obstacles && row.obstacles.has(c))) free.push(c);
+    if (!free.length) continue;
+    row.rainbow = free[randi(0, free.length - 1)];
+    if (row.cheese) row.cheese.delete(row.rainbow);
+    return;
+  }
+}
 
 function startSewer() {
   state = 'sewer'; sewerT = 0;
@@ -702,9 +728,11 @@ function drawRowStuff(row) {
   if (row.type === 'grass') {
     for (const d of (row.decor || [])) drawTreeAt(d.wx, r, d.s, d.kind, true);
     if (row.cheese) for (const c of row.cheese) drawCheeseWorld((c + .5) * TILE, r);
+    if (row.rainbow !== undefined) drawRainbowWorld((row.rainbow + .5) * TILE, r);
     for (const t of row.trees) drawTreeAt((t.c + .5) * TILE, r, t.s, t.kind, false);
   } else if (row.type === 'road') {
     if (row.cheese) for (const c of row.cheese) drawCheeseWorld((c + .5) * TILE, r);
+    if (row.rainbow !== undefined) drawRainbowWorld((row.rainbow + .5) * TILE, r);
     for (const c of row.cars) drawCar(row, c);
   } else if (row.type === 'river') {
     for (const l of row.logs) drawLog(row, l);
@@ -777,6 +805,26 @@ function drawCheeseWorld(wx, r) {
   ctx.restore();
   const a = projP(wx, zc, 14 + b);
   drawCheeseIcon(ctx, a.x, a.y);
+}
+
+function drawRainbowWorld(wx, r) {
+  const zc = zOf(r) + TILE * .5;
+  const b = Math.sin(time * 5 + wx) * 4;
+  const hue = (time * 220) % 360;
+  groundBegin();
+  ctx.fillStyle = 'hsla(' + hue + ',90%,60%,.25)';
+  ctx.beginPath(); ctx.ellipse(wx, zc, 20, 16, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  const a = projP(wx, zc, 18 + b);
+  ctx.fillStyle = 'hsla(' + ((hue + 60) % 360) + ',95%,70%,.4)';
+  ctx.beginPath(); ctx.arc(a.x, a.y, 17, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(a.x, a.y); ctx.scale(1.3, 1.3);
+  ctx.fillStyle = 'hsl(' + hue + ',90%,60%)';
+  ctx.beginPath(); ctx.moveTo(-11, 8); ctx.lineTo(11, 8); ctx.lineTo(11, 2); ctx.lineTo(-4, -9); ctx.lineTo(-11, 2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'hsl(' + ((hue + 120) % 360) + ',90%,55%)';
+  ctx.beginPath(); ctx.arc(2, 2, 2.4, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(-5, 5, 1.8, 0, 7); ctx.fill();
+  ctx.restore();
 }
 
 function drawCar(row, c) {
@@ -907,6 +955,12 @@ function drawPlayer() {
     ctx.restore();
   }
   const a = projP(p.px, zc, hopZ - sink * 22);
+  if (invT > 0 && !p.dead) {
+    const hue = (time * 300) % 360;
+    const alpha = invT < 2 ? (Math.floor(time * 9) % 2 ? .15 : .5) : .4; // blink when running out
+    ctx.fillStyle = 'hsla(' + hue + ',95%,65%,' + alpha + ')';
+    ctx.beginPath(); ctx.arc(a.x, a.y - 10, 36, 0, 7); ctx.fill();
+  }
   ctx.save();
   ctx.translate(a.x, a.y);
   if (p.flung) ctx.rotate(p.flung.t * Math.PI * 3);
@@ -996,6 +1050,15 @@ function drawHUD() {
   }
   // cheese counter
   ctx.font = 'bold 20px Trebuchet MS, sans-serif';
+  if (invT > 0 && state === 'play') {
+    const hue = (time * 300) % 360;
+    ctx.font = 'bold 26px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'center'; ctx.lineWidth = 5;
+    ctx.strokeText('★ ' + Math.ceil(invT), VW / 2, 14);
+    ctx.fillStyle = 'hsl(' + hue + ',90%,65%)';
+    ctx.fillText('★ ' + Math.ceil(invT), VW / 2, 14);
+    ctx.font = 'bold 20px Trebuchet MS, sans-serif';
+  }
   const label = '× ' + runCheese;
   ctx.textAlign = 'right';
   ctx.strokeText(label, VW - 14, 20);
@@ -1114,7 +1177,9 @@ $('menuBtn').onclick = () => { state = 'menu'; $('over').classList.add('hidden')
 window.__rr = {
   fling: () => flingPlayer(),
   sewer: () => startSewer(),
-  info: () => ({ state, r: player.r, fr: player.fr, px: player.px, flung: !!player.flung, score, level, speedMul }),
+  rainbow: () => spawnRainbow(),
+  inv: () => { invT = 10; },
+  info: () => ({ state, r: player.r, fr: player.fr, px: player.px, flung: !!player.flung, score, level, speedMul, invT, runCheese }),
 };
 
 // ---------- main loop ----------
