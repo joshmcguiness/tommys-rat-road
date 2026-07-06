@@ -180,6 +180,7 @@ const store = (() => {
   d.attempts = d.attempts || 0;
   d.counted = d.counted || false; // already tallied in the global player count
   d.muted = d.muted || false;
+  delete d.ghost; // ghost feature removed — clear old recordings
   const save = () => { try { localStorage.setItem('ratroad', JSON.stringify(d)); } catch(e) {} };
   return { d, save };
 })();
@@ -264,7 +265,6 @@ let magT = 0, slowT = 0, revive = 0, nextMagnetAt = 10;
 let weatherT = 45, raining = false;
 let flungRun = 0, swimUsed = false, cheeseFrac = 0, shakeT = 0;
 let floaters = [], flying = [];
-let ghostRec = [], ghostT = 0, runT = 0;
 let daily = false, newUnlock = null;
 
 function makeRow(r) {
@@ -395,7 +395,6 @@ function reset() {
   weatherT = rand(40, 80); raining = false;
   flungRun = 0; swimUsed = false; cheeseFrac = 0; shakeT = 0;
   floaters = []; flying = [];
-  ghostRec = []; ghostT = 0; runT = 0;
   hawk = null; deathTimer = 0; deathType = '';
   queue.length = 0;
 }
@@ -674,8 +673,6 @@ function update(dt) {
   if (shakeT > 0) shakeT -= dt;
   weatherT -= dt;
   if (weatherT <= 0) { raining = !raining; weatherT = raining ? rand(12, 22) : rand(50, 90); }
-  runT += dt; ghostT += dt;
-  if (ghostT >= .08) { ghostT -= .08; if (ghostRec.length < 5000) ghostRec.push([Math.round(p.px), Math.round(p.fr * 100) / 100, p.face]); }
   for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t += dt; if (floaters[i].t > 1) floaters.splice(i, 1); }
   for (let i = flying.length - 1; i >= 0; i--) {
     const f = flying[i]; f.t += dt * 2.4;
@@ -855,18 +852,6 @@ function draw() {
   }
   if (player.dead && deathType === 'splash') drawSplash();
   if (hawk) drawHawk();
-  // ghost of your best run
-  if (state === 'play' && store.d.ghost && store.d.ghost.s && store.d.ghost.s.length) {
-    const gs = store.d.ghost.s, idx = Math.min(gs.length - 1, Math.floor(runT / .08));
-    const s = gs[idx];
-    if (s[1] > camR - 2 && s[1] < camR + 22) {
-      const gskin = SKINS.find(k => k.id === store.d.ghost.skin) || SKINS[0];
-      const ga = projP(s[0], zOf(s[1]) + TILE * .5, 0);
-      ctx.save(); ctx.globalAlpha = .3; ctx.translate(ga.x, ga.y);
-      drawRatVoxel(ctx, 0, 0, gskin, s[2], 1.2, 1);
-      ctx.restore();
-    }
-  }
   // magnet-attracted cheese in flight
   for (const f of flying) {
     const a0 = projP(f.wx, zOf(f.r) + TILE * .5, 12);
@@ -1449,10 +1434,6 @@ function endGame() {
   store.d.cheese += runCheese;
   let newBest = false;
   if (score > store.d.best) { store.d.best = score; newBest = true; }
-  // save the ghost of your best run
-  if (score > 0 && (!store.d.ghost || score >= store.d.ghost.score)) {
-    store.d.ghost = { score, skin: store.d.skin, s: ghostRec };
-  }
   if (daily) { store.d.dailyDone = dailyKey(); store.d.dailyScore = score; }
   store.save();
   const msgs = {
