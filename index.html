@@ -122,6 +122,7 @@
     </div>
     <button id="againBtn" class="btn">PLAY AGAIN</button>
     <button id="menuBtn" class="btn secondary">CHARACTERS</button>
+    <div id="globalStats" class="hint"></div>
   </div>
 </div>
 
@@ -1074,18 +1075,20 @@ const $ = id => document.getElementById(id);
 
 function startGame() {
   store.d.attempts++; store.save();
-  countPlayer();
+  recordAttempt();
   reset();
   state = 'play';
   $('menu').classList.add('hidden');
   $('over').classList.add('hidden');
 }
 
-// count this browser once, ever, in the worldwide player tally
-function countPlayer() {
-  if (!LB_URL || store.d.counted) return;
-  fetch(LB_URL + '/stats' + LB_BOARD, { method: 'POST' })
-    .then(r => { if (r.ok) { store.d.counted = true; store.save(); } })
+// tally this attempt worldwide; first-ever attempt also registers this browser as a new player
+function recordAttempt() {
+  if (!LB_URL) return;
+  const isNew = !store.d.counted;
+  const q = LB_BOARD + (isNew ? (LB_BOARD ? '&' : '?') + 'new=1' : '');
+  fetch(LB_URL + '/stats' + q, { method: 'POST' })
+    .then(r => { if (r.ok && isNew) { store.d.counted = true; store.save(); } })
     .catch(() => {});
 }
 
@@ -1103,6 +1106,19 @@ function endGame() {
   $('overStats').innerHTML = (newBest ? '<div class="newbest">★ NEW BEST ★</div>' : 'best ' + store.d.best) + '<br>attempt #' + store.d.attempts + ' · level ' + level + '<br>🧀 +' + runCheese + ' (total ' + store.d.cheese + ')';
   $('over').classList.remove('hidden');
   showLeaderboard();
+  showGlobalStats();
+}
+
+function showGlobalStats() {
+  if (!LB_URL) return;
+  $('globalStats').textContent = '';
+  fetch(LB_URL + '/stats' + LB_BOARD)
+    .then(r => r.json())
+    .then(s => {
+      if (state !== 'dead') return;
+      $('globalStats').textContent = '🌍 ' + s.attempts.toLocaleString() + (s.attempts === 1 ? ' attempt' : ' attempts') + ' by ' + s.players.toLocaleString() + (s.players === 1 ? ' player' : ' players') + ' worldwide';
+    })
+    .catch(() => {});
 }
 
 // ---------- global leaderboard ----------

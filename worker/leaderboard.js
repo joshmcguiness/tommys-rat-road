@@ -17,17 +17,24 @@ export default {
     const berry = url.searchParams.get('board') === 'berry';
     const board = berry ? 'top-berry' : 'top';
 
-    // /stats — global unique-player counter (clients POST once per browser)
+    // /stats — global counters. POST = one attempt (add ?new=1 to also count a new player).
     if (url.pathname === '/stats') {
-      const key = berry ? 'players-berry' : 'players';
+      const pKey = berry ? 'players-berry' : 'players';
+      const aKey = berry ? 'attempts-berry' : 'attempts';
       if (req.method === 'GET') {
-        const n = parseInt((await env.SCORES.get(key)) || '0', 10);
-        return Response.json({ players: n }, { headers: CORS });
+        const players = parseInt((await env.SCORES.get(pKey)) || '0', 10);
+        const attempts = parseInt((await env.SCORES.get(aKey)) || '0', 10);
+        return Response.json({ players, attempts }, { headers: CORS });
       }
       if (req.method === 'POST') {
-        const n = parseInt((await env.SCORES.get(key)) || '0', 10) + 1;
-        await env.SCORES.put(key, String(n));
-        return Response.json({ players: n }, { headers: CORS });
+        const attempts = parseInt((await env.SCORES.get(aKey)) || '0', 10) + 1;
+        await env.SCORES.put(aKey, String(attempts));
+        let players = parseInt((await env.SCORES.get(pKey)) || '0', 10);
+        if (url.searchParams.get('new')) {
+          players += 1;
+          await env.SCORES.put(pKey, String(players));
+        }
+        return Response.json({ players, attempts }, { headers: CORS });
       }
       return new Response('Method not allowed', { status: 405, headers: CORS });
     }
