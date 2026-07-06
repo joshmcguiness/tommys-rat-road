@@ -12,12 +12,29 @@ export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const url = new URL(req.url);
+
+    // separate boards per game: default (Rat Road) vs 'berry' (Blueberry Dash)
+    const berry = url.searchParams.get('board') === 'berry';
+    const board = berry ? 'top-berry' : 'top';
+
+    // /stats — global unique-player counter (clients POST once per browser)
+    if (url.pathname === '/stats') {
+      const key = berry ? 'players-berry' : 'players';
+      if (req.method === 'GET') {
+        const n = parseInt((await env.SCORES.get(key)) || '0', 10);
+        return Response.json({ players: n }, { headers: CORS });
+      }
+      if (req.method === 'POST') {
+        const n = parseInt((await env.SCORES.get(key)) || '0', 10) + 1;
+        await env.SCORES.put(key, String(n));
+        return Response.json({ players: n }, { headers: CORS });
+      }
+      return new Response('Method not allowed', { status: 405, headers: CORS });
+    }
+
     if (url.pathname !== '/scores') {
       return new Response('Not found', { status: 404, headers: CORS });
     }
-
-    // separate boards per game: default key 'top' (Rat Road), 'top-berry' (Blueberry Dash)
-    const board = url.searchParams.get('board') === 'berry' ? 'top-berry' : 'top';
 
     if (req.method === 'GET') {
       const top = JSON.parse((await env.SCORES.get(board)) || '[]');

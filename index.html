@@ -101,6 +101,7 @@
     <h1>TOMMY'S RAT ROAD</h1>
     <div class="tag">why did the rat cross the road?</div>
     <div id="bank">🧀 0</div>
+    <div id="stats" class="hint"></div>
     <div id="chars"></div>
     <button id="playBtn" class="btn">PLAY</button>
     <div class="hint">Arrows / WASD to hop &nbsp;·&nbsp; swipe on touch<br>Collect 🧀 to unlock new rats. Don't dawdle — the hawk is watching.</div>
@@ -153,6 +154,8 @@ const store = (() => {
   d.unlocked = d.unlocked || ['brown','lab'];
   d.skin = d.skin || 'brown';
   d.name = d.name || '';
+  d.attempts = d.attempts || 0;
+  d.counted = d.counted || false; // already tallied in the global player count
   const save = () => { try { localStorage.setItem('ratroad', JSON.stringify(d)); } catch(e) {} };
   return { d, save };
 })();
@@ -1070,10 +1073,20 @@ function drawHUD() {
 const $ = id => document.getElementById(id);
 
 function startGame() {
+  store.d.attempts++; store.save();
+  countPlayer();
   reset();
   state = 'play';
   $('menu').classList.add('hidden');
   $('over').classList.add('hidden');
+}
+
+// count this browser once, ever, in the worldwide player tally
+function countPlayer() {
+  if (!LB_URL || store.d.counted) return;
+  fetch(LB_URL + '/stats' + LB_BOARD, { method: 'POST' })
+    .then(r => { if (r.ok) { store.d.counted = true; store.save(); } })
+    .catch(() => {});
 }
 
 function endGame() {
@@ -1087,13 +1100,14 @@ function endGame() {
   };
   $('deathMsg').textContent = msgs[deathType] || '';
   $('finalScore').textContent = score;
-  $('overStats').innerHTML = (newBest ? '<div class="newbest">★ NEW BEST ★</div>' : 'best ' + store.d.best) + '<br>reached level ' + level + '<br>🧀 +' + runCheese + ' (total ' + store.d.cheese + ')';
+  $('overStats').innerHTML = (newBest ? '<div class="newbest">★ NEW BEST ★</div>' : 'best ' + store.d.best) + '<br>attempt #' + store.d.attempts + ' · level ' + level + '<br>🧀 +' + runCheese + ' (total ' + store.d.cheese + ')';
   $('over').classList.remove('hidden');
   showLeaderboard();
 }
 
 // ---------- global leaderboard ----------
 const LB_URL = 'https://rat-road-leaderboard.josh-mcguiness.workers.dev';
+const LB_BOARD = ''; // this game uses the default board
 let lbRun = 0; // ignore stale fetches from earlier runs
 
 async function showLeaderboard() {
@@ -1141,6 +1155,13 @@ $('nameBtn').onclick = () => {
 
 function buildMenu() {
   $('bank').textContent = '🧀 ' + store.d.cheese;
+  $('stats').textContent = 'your attempts: ' + store.d.attempts;
+  if (LB_URL) {
+    fetch(LB_URL + '/stats' + LB_BOARD)
+      .then(r => r.json())
+      .then(s => { $('stats').textContent = 'your attempts: ' + store.d.attempts + '  ·  👥 ' + s.players + ' players worldwide'; })
+      .catch(() => {});
+  }
   const box = $('chars'); box.innerHTML = '';
   for (const s of SKINS) {
     const unlocked = store.d.unlocked.includes(s.id);
