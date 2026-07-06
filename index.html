@@ -41,6 +41,14 @@
   .char .pk { display: block; font-size: 9px; color: #8fa3c8; margin-top: 1px; }
   .hint { font-size: 13px; color: #98a3b8; line-height: 1.6; }
   #bank { font-size: 16px; color: #ffd94a; font-weight: bold; }
+  #muteBtn {
+    position: absolute; top: 58px; right: 10px; z-index: 10;
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.3); background: rgba(18,24,34,.5);
+    color: #fff; font-size: 19px; cursor: pointer; line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #muteBtn:active { transform: scale(.92); }
   #pad {
     position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%;
     transform: translateX(-50%);
@@ -90,6 +98,8 @@
 <body>
 <div id="wrap">
   <canvas id="game"></canvas>
+
+  <button id="muteBtn" aria-label="toggle sound">🔊</button>
 
   <div id="pad">
     <button id="padUp" class="padBtn" aria-label="hop forward">▲</button>
@@ -169,6 +179,7 @@ const store = (() => {
   d.name = d.name || '';
   d.attempts = d.attempts || 0;
   d.counted = d.counted || false; // already tallied in the global player count
+  d.muted = d.muted || false;
   const save = () => { try { localStorage.setItem('ratroad', JSON.stringify(d)); } catch(e) {} };
   return { d, save };
 })();
@@ -177,7 +188,7 @@ const store = (() => {
 let actx = null;
 function initAudio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} } }
 function beep(freq, dur, type, vol, slide) {
-  if (!actx) return;
+  if (!actx || store.d.muted) return;
   const o = actx.createOscillator(), g = actx.createGain();
   o.type = type || 'square'; o.frequency.value = freq;
   if (slide) o.frequency.exponentialRampToValueAtTime(slide, actx.currentTime + dur);
@@ -422,6 +433,7 @@ window.addEventListener('keydown', e => {
   }
   const k = e.key;
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k)) e.preventDefault();
+  if (k === 'm' || k === 'M') { document.getElementById('muteBtn').click(); return; }
   initAudio();
   if (state === 'menu' && (k === 'Enter' || k === ' ')) { startGame(); return; }
   if (state === 'dead' && (k === 'Enter' || k === ' ')) { startGame(); return; }
@@ -430,6 +442,16 @@ window.addEventListener('keydown', e => {
   else if (k === 'ArrowDown' || k === 's' || k === 'S') tryHop(2);
   else if (k === 'ArrowLeft' || k === 'a' || k === 'A') tryHop(3);
 });
+
+// mute toggle (press M or tap the speaker)
+const muteBtn = document.getElementById('muteBtn');
+function syncMute() { muteBtn.textContent = store.d.muted ? '🔇' : '🔊'; }
+muteBtn.onclick = () => {
+  store.d.muted = !store.d.muted; store.save();
+  syncMute();
+  if (!store.d.muted) { initAudio(); beep(700, .08, 'square', .06); }
+};
+syncMute();
 
 // on-screen d-pad for touch devices (iPad/iPhone)
 const isTouch = ('ontouchstart' in window) || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
