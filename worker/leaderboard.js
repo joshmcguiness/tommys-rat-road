@@ -15,7 +15,10 @@ export default {
 
     // separate boards per game: default (Rat Road) vs 'berry' (Blueberry Dash)
     const berry = url.searchParams.get('board') === 'berry';
-    const board = berry ? 'top-berry' : 'top';
+    let board = berry ? 'top-berry' : 'top';
+    // daily-challenge boards get their own key per date
+    const day = url.searchParams.get('day');
+    if (day && /^\d{8}$/.test(day)) board += '-d' + day;
 
     // /stats — global counters. POST = one attempt (add ?new=1 to also count a new player).
     if (url.pathname === '/stats') {

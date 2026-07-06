@@ -38,6 +38,7 @@
   .char.locked { opacity: .75; }
   .char .nm { font-weight: bold; display: block; margin-top: 2px; }
   .char .st { color: #ffd94a; font-size: 11px; }
+  .char .pk { display: block; font-size: 9px; color: #8fa3c8; margin-top: 1px; }
   .hint { font-size: 13px; color: #98a3b8; line-height: 1.6; }
   #bank { font-size: 16px; color: #ffd94a; font-weight: bold; }
   #pad {
@@ -104,6 +105,7 @@
     <div id="stats" class="hint"></div>
     <div id="chars"></div>
     <button id="playBtn" class="btn">PLAY</button>
+    <button id="dailyBtn" class="btn secondary">DAILY RUN</button>
     <div class="hint">Arrows / WASD to hop &nbsp;·&nbsp; swipe on touch<br>Collect 🧀 to unlock new rats. Don't dawdle — the hawk is watching.</div>
   </div>
 
@@ -121,6 +123,7 @@
       </div>
     </div>
     <button id="againBtn" class="btn">PLAY AGAIN</button>
+    <button id="shareBtn" class="btn secondary">SHARE SCORE</button>
     <button id="menuBtn" class="btn secondary">CHARACTERS</button>
     <div id="globalStats" class="hint"></div>
   </div>
@@ -135,14 +138,23 @@ const HOP_TIME = 0.13, HOP_ARC = 16;
 
 const SKINS = [
   { id:'brown',    name:'Brown Rat',  cost:0,  body:'#8a5a33', belly:'#c9a06b', ear:'#e8a0a0', eye:'#221a12', tail:'#d99b8a' },
-  { id:'lab',      name:'Lab Rat',    cost:0,  body:'#f1f1f1', belly:'#ffffff', ear:'#f7bfc5', eye:'#c0392b', tail:'#f7bfc5' },
-  { id:'black',    name:'Black Rat',  cost:100, body:'#33303a', belly:'#57525f', ear:'#8a7f8f', eye:'#e8d44a', tail:'#8a7f8f' },
-  { id:'hooded',   name:'Fancy Rat',  cost:160, body:'#f4ede1', belly:'#ffffff', ear:'#e8a0a0', eye:'#221a12', tail:'#e8b3a0', hood:'#7a4a2b' },
-  { id:'sewer',    name:'Sewer Rat',  cost:200, body:'#6b7d6a', belly:'#8fa08c', ear:'#9caf99', eye:'#d43a2f', tail:'#9caf99', grime:true },
-  { id:'golden',   name:'Golden Rat', cost:300, body:'#e0a93e', belly:'#f5d47e', ear:'#f0c46a', eye:'#4a2c00', tail:'#f0c46a' },
-  { id:'hairless', name:'Hairless',   cost:400, body:'#e8b9a8', belly:'#f5d3c6', ear:'#d99a86', eye:'#221a12', tail:'#d99a86', wrinkles:true },
-  { id:'king',     name:'Rat King',   cost:600, body:'#5b4a86', belly:'#8a76b8', ear:'#a794d4', eye:'#ffd94a', tail:'#a794d4', crown:true },
+  { id:'lab',      name:'Lab Rat',    cost:0,  body:'#f1f1f1', belly:'#ffffff', ear:'#f7bfc5', eye:'#c0392b', tail:'#f7bfc5', perk:'charm' },
+  { id:'black',    name:'Black Rat',  cost:100, body:'#33303a', belly:'#57525f', ear:'#8a7f8f', eye:'#e8d44a', tail:'#8a7f8f', perk:'patient' },
+  { id:'hooded',   name:'Fancy Rat',  cost:160, body:'#f4ede1', belly:'#ffffff', ear:'#e8a0a0', eye:'#221a12', tail:'#e8b3a0', hood:'#7a4a2b', perk:'longrainbow' },
+  { id:'sewer',    name:'Sewer Rat',  cost:200, body:'#6b7d6a', belly:'#8fa08c', ear:'#9caf99', eye:'#d43a2f', tail:'#9caf99', grime:true, perk:'swimmer' },
+  { id:'golden',   name:'Golden Rat', cost:300, body:'#e0a93e', belly:'#f5d47e', ear:'#f0c46a', eye:'#4a2c00', tail:'#f0c46a', perk:'greedy' },
+  { id:'hairless', name:'Hairless',   cost:400, body:'#e8b9a8', belly:'#f5d3c6', ear:'#d99a86', eye:'#221a12', tail:'#d99a86', wrinkles:true, perk:'quick' },
+  { id:'king',     name:'Rat King',   cost:600, body:'#5b4a86', belly:'#8a76b8', ear:'#a794d4', eye:'#ffd94a', tail:'#a794d4', crown:true, perk:'headstart' },
+  { id:'scuba',    name:'Scuba Rat',  secret:true, hint:'drown 10 times', body:'#2a9db5', belly:'#7fd4e2', ear:'#7fd4e2', eye:'#221a12', tail:'#7fd4e2', goggles:true, tank:true, perk:'swimmer' },
+  { id:'ninja',    name:'Ninja Rat',  secret:true, hint:'play after midnight', body:'#2c2c34', belly:'#44444e', ear:'#57525f', eye:'#e8d44a', tail:'#44444e', headband:true, perk:'quick' },
+  { id:'stunt',    name:'Stunt Rat',  secret:true, hint:'flung 3× in one run', body:'#f1f1f1', belly:'#ffffff', ear:'#f7bfc5', eye:'#2980d9', tail:'#f7bfc5', cape:true, perk:'stuntman' },
 ];
+
+const PERK_TEXT = {
+  charm: 'lucky charms', patient: 'patient hawk', longrainbow: 'longer rainbows',
+  swimmer: 'one free swim', greedy: '+25% cheese', quick: 'quick hops',
+  headstart: '3s head start', stuntman: 'flung forward',
+};
 
 const CAR_COLORS = ['#e74c3c','#3498db','#f39c12','#9b59b6','#1abc9c','#e67e22','#ecf0f1','#e84393'];
 
@@ -183,6 +195,10 @@ const sfx = {
   fling:  () => beep(180, .55, 'sine', .1, 900),
   sewer:  () => { beep(500, .3, 'sine', .08, 130); setTimeout(() => beep(160, .35, 'square', .07, 720), 500); },
   rainbow:() => { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => beep(f, .14, 'square', .06), i * 70)); },
+  close:  () => beep(950, .06, 'square', .07, 1250),
+  magnet: () => { beep(600, .1, 'square', .06, 900); setTimeout(() => beep(900, .12, 'square', .06, 1300), 100); },
+  slow:   () => beep(400, .5, 'sine', .09, 90),
+  meow:   () => beep(700, .18, 'sawtooth', .05, 380),
   unlock: () => { [523,659,784,1047].forEach((f,i) => setTimeout(() => beep(f,.12,'square',.06), i*90)); },
 };
 
@@ -204,6 +220,20 @@ window.addEventListener('resize', fit); fit();
 const rand = (a, b) => a + Math.random() * (b - a);
 const randi = (a, b) => Math.floor(rand(a, b + 1));
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+// seeded stream for world generation, so daily-challenge worlds are identical for everyone
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let genRand = Math.random;
+const randG = (a, b) => a + genRand() * (b - a);
+const randiG = (a, b) => Math.floor(randG(a, b + 1));
+function dailySeed() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function dailyKey() { return String(dailySeed()); }
 function rr(x, y, w, h, r) { // rounded rect path
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -219,16 +249,22 @@ let state = 'menu'; // menu | play | dying | sewer
 let rows, player, camR, camSpeed, score, runCheese, deathTimer, deathType, hawk, idleTime, time;
 let level, speedMul, pendingSewer, sewerT;
 let invT = 0, nextRainbowAt = 20; // rainbow cheese invincibility
+let magT = 0, slowT = 0, revive = 0, nextMagnetAt = 10;
+let weatherT = 45, raining = false;
+let flungRun = 0, swimUsed = false, cheeseFrac = 0, shakeT = 0;
+let floaters = [], flying = [];
+let ghostRec = [], ghostT = 0, runT = 0;
+let daily = false, newUnlock = null;
 
 function makeRow(r) {
-  // decide type based on previous rows
+  // decide type based on previous rows (all gen randomness uses the seedable stream)
   const prev = rows.get(r - 1);
   const prev2 = rows.get(r - 2);
   let type;
   if (r <= 3) type = 'grass';
   else {
     const t1 = prev ? prev.type : 'grass', t2 = prev2 ? prev2.type : 'grass';
-    const roll = Math.random();
+    const roll = genRand();
     if (t1 === 'river' && t2 === 'river') type = roll < .6 ? 'grass' : 'road';
     else if (t1 === 'road' && t2 === 'road' && prev2 && rows.get(r-3) && rows.get(r-3).type === 'road') type = roll < .5 ? 'grass' : (roll < .75 ? 'river' : 'rail');
     else {
@@ -247,26 +283,28 @@ function makeRow(r) {
     row.obstacles = new Set();
     row.cheese = new Set();
     if (r > 2) {
-      const n = randi(0, 3);
+      const n = randiG(0, 3);
       for (let i = 0; i < n; i++) {
-        const c = randi(0, COLS - 1);
+        const c = randiG(0, COLS - 1);
         row.obstacles.add(c);
       }
       if (row.obstacles.size >= COLS - 2) row.obstacles.clear(); // never near-block a row
       for (let c = 0; c < COLS; c++)
-        if (!row.obstacles.has(c) && Math.random() < .06) row.cheese.add(c);
+        if (!row.obstacles.has(c) && genRand() < .06) row.cheese.add(c);
       row.trees = [...row.obstacles].sort((a, b) => a - b).map(c => {
-        const roll = Math.random();
+        const roll = genRand();
         const kind = roll < .5 ? 'tree' : roll < .65 ? 'rock' : roll < .85 ? 'bin' : 'lamp';
-        return { c, kind, s: rand(.85, 1.15) };
+        return { c, kind, s: randG(.85, 1.15) };
       });
+      // a prowling predator patrols some grass rows
+      if (r > 8 && genRand() < .07) row.cat = { x: randG(TILE, W - TILE), dir: genRand() < .5 ? 1 : -1 };
     } else { row.trees = []; }
     // scenery outside the playfield
     row.decor = [];
-    const nd = randi(3, 7);
+    const nd = randiG(3, 7);
     for (let i = 0; i < nd; i++) {
-      const left = Math.random() < .5;
-      row.decor.push({ wx: left ? rand(-1100, -60) : rand(W + 60, W + 1100), s: rand(.8, 1.35), kind: Math.random() < .8 ? 'tree' : 'rock' });
+      const left = genRand() < .5;
+      row.decor.push({ wx: left ? randG(-1100, -60) : randG(W + 60, W + 1100), s: randG(.8, 1.35), kind: genRand() < .8 ? 'tree' : 'rock' });
     }
     // street lamps lining the road
     const lm = ((r % 3) + 3) % 3;
@@ -274,39 +312,46 @@ function makeRow(r) {
     if (lm === 1) row.decor.push({ wx: W + 32, s: 1, kind: 'lamp' });
   }
   else if (type === 'road') {
-    row.dir = Math.random() < .5 ? 1 : -1;
-    row.speed = rand(55, 95) * (1 + diff * 1.1);
+    row.dir = genRand() < .5 ? 1 : -1;
+    row.speed = randG(55, 95) * (1 + diff * 1.1);
     row.cars = [];
     row.cheese = new Set();
     const loop = W + 520;
-    const n = randi(2, 3);
-    let x = rand(0, 150);
+    const n = randiG(2, 3);
+    let x = randG(0, 150);
     for (let i = 0; i < n; i++) {
-      const truck = Math.random() < .22;
-      row.cars.push({ x: x % loop, len: truck ? TILE * 2.4 : TILE * 1.55, truck, color: CAR_COLORS[randi(0, CAR_COLORS.length - 1)] });
-      x += loop / n + rand(-40, 40);
+      const truck = genRand() < .22;
+      row.cars.push({ x: x % loop, len: truck ? TILE * 2.4 : TILE * 1.55, truck, color: CAR_COLORS[randiG(0, CAR_COLORS.length - 1)] });
+      x += loop / n + randG(-40, 40);
     }
     row.loop = loop;
-    for (let c = 0; c < COLS; c++) if (Math.random() < .04) row.cheese.add(c);
+    for (let c = 0; c < COLS; c++) if (genRand() < .04) row.cheese.add(c);
   }
   else if (type === 'river') {
-    row.dir = (prev && prev.type === 'river') ? -prev.dir : (Math.random() < .5 ? 1 : -1);
-    row.speed = rand(38, 62) * (1 + diff * .8);
+    row.dir = (prev && prev.type === 'river') ? -prev.dir : (genRand() < .5 ? 1 : -1);
+    row.speed = randG(38, 62) * (1 + diff * .8);
     row.logs = [];
     const loop = W + 440;
-    const n = randi(3, 4);
-    let x = rand(0, 120);
-    for (let i = 0; i < n; i++) {
-      row.logs.push({ x: x % loop, len: TILE * rand(2.1, 3.1) });
-      x += loop / n + rand(-30, 30);
+    if (r > 6 && genRand() < .35) {
+      // lily-pad river: fixed pads that sink under your feet
+      row.pads = {};
+      let c = randiG(0, 1);
+      while (c < COLS) { row.pads[c] = { t: 0, on: false }; c += randiG(2, 3); }
+    } else {
+      const n = randiG(3, 4);
+      let x = randG(0, 120);
+      for (let i = 0; i < n; i++) {
+        row.logs.push({ x: x % loop, len: TILE * randG(2.1, 3.1) });
+        x += loop / n + randG(-30, 30);
+      }
     }
     row.loop = loop;
   }
   else if (type === 'rail') {
     row.state = 'idle';
-    row.timer = rand(2.5, 6);
+    row.timer = randG(2.5, 6);
     row.trainX = -9999;
-    row.trainDir = Math.random() < .5 ? 1 : -1;
+    row.trainDir = genRand() < .5 ? 1 : -1;
     row.cheese = new Set();
   }
   rows.set(r, row);
@@ -317,6 +362,7 @@ function genRowsUpTo(n) { for (let r = maxGen + 1; r <= n; r++) makeRow(r); if (
 let maxGen = -1;
 
 function reset() {
+  genRand = daily ? mulberry32((dailySeed() * 2654435761) % 2147483647) : Math.random;
   rows = new Map(); maxGen = -1;
   for (let r = -16; r <= 0; r++) { rows.set(r, { type:'grass', r, shade: (r % 2 + 2) % 2 === 0, obstacles: new Set(), cheese: new Set(), trees: [] }); }
   maxGen = 0;
@@ -332,7 +378,13 @@ function reset() {
   camR = -4.2; camSpeed = .38; camX = W / 2;
   score = 0; runCheese = 0; idleTime = 0; time = 0;
   level = 1; speedMul = 1; pendingSewer = false; sewerT = 0;
-  invT = 0; nextRainbowAt = 20;
+  invT = currentSkin().perk === 'headstart' ? 3 : 0;
+  nextRainbowAt = 20; nextMagnetAt = 10;
+  magT = 0; slowT = 0; revive = 0;
+  weatherT = rand(40, 80); raining = false;
+  flungRun = 0; swimUsed = false; cheeseFrac = 0; shakeT = 0;
+  floaters = []; flying = [];
+  ghostRec = []; ghostT = 0; runT = 0;
   hawk = null; deathTimer = 0; deathType = '';
   queue.length = 0;
 }
@@ -405,9 +457,86 @@ cv.addEventListener('pointerup', e => {
 // ---------- update ----------
 function kill(type) {
   if (state !== 'play') return;
+  if (revive > 0) { revive = 0; doRevive(); return; } // second chance!
   state = 'dying'; deathType = type; deathTimer = 0;
   player.dead = true;
-  if (type === 'splash') sfx.splash(); else sfx.die();
+  if (type === 'splash') {
+    sfx.splash();
+    store.d.drowns = (store.d.drowns || 0) + 1;
+    if (store.d.drowns >= 10) unlockSecret('scuba');
+    store.save();
+  } else sfx.die();
+}
+
+function drown() {
+  // swimmer perk: one free leap out of the water per run
+  if (currentSkin().perk === 'swimmer' && !swimUsed) {
+    swimUsed = true;
+    floaters.push({ wx: player.px, r: player.fr, txt: 'SWIM!', t: 0 });
+    flingPlayer(false);
+    return;
+  }
+  kill('splash');
+}
+
+function doRevive() {
+  const p = player;
+  let r = Math.max(Math.ceil(camR) + 5, p.r);
+  for (let i = 0; i < 15; i++, r++) {
+    genRowsUpTo(r + 2);
+    const row = rows.get(r);
+    if (row && row.type === 'grass') break;
+  }
+  const row = rows.get(r);
+  let col = 4;
+  for (let d2 = 0; d2 < 5; d2++) {
+    if (!row || !row.obstacles || !row.obstacles.has(clamp(4 + d2, 0, COLS - 1))) { col = clamp(4 + d2, 0, COLS - 1); break; }
+    if (!row.obstacles.has(clamp(4 - d2, 0, COLS - 1))) { col = clamp(4 - d2, 0, COLS - 1); break; }
+  }
+  p.hopping = false; p.flung = null; queue.length = 0;
+  p.r = r; p.fr = r; p.px = (col + .5) * TILE; p.toR = r; p.toX = p.px;
+  invT = Math.max(invT, 2.5); idleTime = 0;
+  floaters.push({ wx: p.px, r: p.fr, txt: 'SECOND CHANCE!', t: 0 });
+  sfx.rainbow();
+}
+
+function gainCheese() {
+  runCheese++;
+  if (currentSkin().perk === 'greedy') {
+    cheeseFrac += .25;
+    if (cheeseFrac >= 1) { cheeseFrac--; runCheese++; }
+  }
+  if (runCheese >= nextRainbowAt) { nextRainbowAt += 20; spawnPickup('rainbow'); }
+  if (runCheese >= nextMagnetAt) { nextMagnetAt += 20; spawnPickup('magnet'); }
+  else if (Math.random() < .05) spawnPickup('potion');
+  else if (revive === 0 && Math.random() < (currentSkin().perk === 'charm' ? .07 : .03)) spawnPickup('heart');
+}
+
+function attractCheese() {
+  const p = player;
+  for (let r = Math.floor(p.fr) - 2; r <= Math.floor(p.fr) + 3; r++) {
+    const row = rows.get(r);
+    if (!row || !row.cheese || !row.cheese.size) continue;
+    for (const c of [...row.cheese]) {
+      const dx = (c + .5) * TILE - p.px, dz = (r - p.fr) * TILE;
+      if (dx * dx + dz * dz < 135 * 135) { row.cheese.delete(c); flying.push({ wx: (c + .5) * TILE, r, t: 0 }); }
+    }
+  }
+}
+
+function applyPickup(kind) {
+  if (kind === 'rainbow') { invT = currentSkin().perk === 'longrainbow' ? 14 : 10; sfx.rainbow(); }
+  else if (kind === 'magnet') { magT = 10; sfx.magnet(); }
+  else if (kind === 'potion') { slowT = 8; sfx.slow(); }
+  else if (kind === 'heart') { revive = 1; sfx.unlock(); }
+}
+
+function unlockSecret(id) {
+  if (store.d.unlocked.includes(id)) return;
+  store.d.unlocked.push(id); store.save();
+  const s = SKINS.find(k => k.id === id);
+  newUnlock = s ? s.name : id;
+  sfx.unlock();
 }
 
 function update(dt) {
@@ -416,21 +545,34 @@ function update(dt) {
   refreshView();
   const lo = VB.loR, hi = VB.hiR;
   genRowsUpTo(hi + 4);
+  const sMul = slowT > 0 ? .5 : 1;         // time-slow potion
+  const rMul = raining ? 1.3 : 1;          // rain speeds up the water
   for (let r = lo; r <= hi; r++) {
     const row = rows.get(r); if (!row) continue;
     if (row.type === 'road') {
-      for (const c of row.cars) { c.x = (c.x + row.speed * speedMul * row.dir * dt + row.loop) % row.loop; }
+      for (const c of row.cars) { c.x = (c.x + row.speed * speedMul * sMul * row.dir * dt + row.loop) % row.loop; }
+    } else if (row.type === 'grass') {
+      if (row.cat) {
+        row.cat.x += 34 * sMul * row.cat.dir * dt;
+        if (row.cat.x < TILE * .6) row.cat.dir = 1;
+        if (row.cat.x > W - TILE * .6) row.cat.dir = -1;
+      }
     } else if (row.type === 'river') {
-      for (const l of row.logs) { l.x = (l.x + row.speed * speedMul * row.dir * dt + row.loop) % row.loop; }
+      for (const l of row.logs) { l.x = (l.x + row.speed * speedMul * sMul * rMul * row.dir * dt + row.loop) % row.loop; }
+      if (row.pads) for (const k in row.pads) {
+        const pad = row.pads[k];
+        if (!pad.on) pad.t = Math.max(0, pad.t - dt * .8);
+        pad.on = false;
+      }
     } else if (row.type === 'rail') {
-      row.timer -= dt;
+      row.timer -= dt * sMul;
       if (row.state === 'idle' && row.timer <= 0) {
         row.state = 'warn'; row.timer = 1.1;
         if (Math.abs(r - player.r) < 9 && state === 'play') sfx.bell();
       } else if (row.state === 'warn' && row.timer <= 0) {
         row.state = 'train'; row.trainX = row.trainDir === 1 ? -TILE * 14 : W + TILE * 14;
       } else if (row.state === 'train') {
-        row.trainX += 430 * speedMul * row.trainDir * dt;
+        row.trainX += 430 * speedMul * sMul * row.trainDir * dt;
         if (row.trainX < -TILE * 15 || row.trainX > W + TILE * 15) { row.state = 'idle'; row.timer = rand(3, 8); }
       }
     }
@@ -442,7 +584,7 @@ function update(dt) {
 
   if (state === 'dying') {
     deathTimer += dt;
-    if (deathType === 'car' || deathType === 'train') p.squash = Math.max(.12, p.squash - dt * 8);
+    if (deathType === 'car' || deathType === 'train' || deathType === 'cat') p.squash = Math.max(.12, p.squash - dt * 8);
     if (deathType === 'splash') p.sink += dt * 2.2;
     if (deathType === 'hawk' && hawk) { hawk.y -= dt * 900; }
     if (deathTimer > .95) endGame();
@@ -472,7 +614,7 @@ function update(dt) {
 
   // hop tween
   if (p.hopping) {
-    p.hopT += dt / HOP_TIME;
+    p.hopT += dt / (currentSkin().perk === 'quick' ? .105 : HOP_TIME);
     if (p.hopT >= 1) {
       p.hopT = 1; p.hopping = false;
       p.px = p.toX; p.fr = p.toR;
@@ -484,12 +626,11 @@ function update(dt) {
       const row = rows.get(p.r);
       const col = Math.round(p.px / TILE - .5);
       if (row && row.cheese && row.cheese.has(col)) {
-        row.cheese.delete(col); runCheese++; sfx.cheese();
-        if (runCheese >= nextRainbowAt) { nextRainbowAt += 20; spawnRainbow(); }
+        row.cheese.delete(col); gainCheese(); sfx.cheese();
       }
-      if (row && row.rainbow === col) {
-        delete row.rainbow;
-        invT = 10; sfx.rainbow();
+      if (row && row.pu && row.pu.c === col) {
+        applyPickup(row.pu.kind);
+        delete row.pu;
       }
       // dive into the sewer on the first dry landing past the threshold
       if (pendingSewer && row && row.type !== 'river') { pendingSewer = false; startSewer(); return; }
@@ -506,20 +647,42 @@ function update(dt) {
 
   // rainbow-cheese invincibility (water and falling behind still count)
   if (invT > 0) { invT -= dt; idleTime = 0; }
+  if (slowT > 0) slowT -= dt;
+  if (magT > 0) { magT -= dt; attractCheese(); }
+  if (shakeT > 0) shakeT -= dt;
+  weatherT -= dt;
+  if (weatherT <= 0) { raining = !raining; weatherT = raining ? rand(12, 22) : rand(50, 90); }
+  runT += dt; ghostT += dt;
+  if (ghostT >= .08) { ghostT -= .08; if (ghostRec.length < 5000) ghostRec.push([Math.round(p.px), Math.round(p.fr * 100) / 100, p.face]); }
+  for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t += dt; if (floaters[i].t > 1) floaters.splice(i, 1); }
+  for (let i = flying.length - 1; i >= 0; i--) {
+    const f = flying[i]; f.t += dt * 2.4;
+    if (f.t >= 1) { flying.splice(i, 1); gainCheese(); sfx.cheese(); }
+  }
 
   // river logic (only when settled)
   const curRow = rows.get(p.r);
   if (!p.hopping && curRow) {
     if (curRow.type === 'river') {
-      let onLog = null;
-      for (const l of curRow.logs) {
-        const lx = logScreenX(curRow, l);
-        if (p.px > lx - 6 && p.px < lx + l.len + 6) { onLog = l; break; }
+      if (curRow.pads) {
+        // lily pads: solid ground that sinks the longer you stand on it
+        const c = Math.round(p.px / TILE - .5);
+        const pad = curRow.pads[c];
+        if (!pad) { drown(); return; }
+        pad.on = true;
+        pad.t += dt * (pad.t > .9 ? 2 : 1);
+        if (pad.t > 1.15) { drown(); return; }
+      } else {
+        let onLog = null;
+        for (const l of curRow.logs) {
+          const lx = logScreenX(curRow, l);
+          if (p.px > lx - 6 && p.px < lx + l.len + 6) { onLog = l; break; }
+        }
+        if (onLog) {
+          p.px += curRow.speed * speedMul * sMul * rMul * curRow.dir * dt;
+          if (p.px < 10 || p.px > W - 10) { drown(); return; }
+        } else { drown(); return; }
       }
-      if (onLog) {
-        p.px += curRow.speed * speedMul * curRow.dir * dt;
-        if (p.px < 10 || p.px > W - 10) { kill('splash'); return; }
-      } else { kill('splash'); return; }
     }
   }
 
@@ -530,12 +693,22 @@ function update(dt) {
     for (const c of rowC.cars) {
       const cx = carScreenX(rowC, c);
       if (p.px + 15 > cx && p.px - 15 < cx + c.len) { kill('car'); return; }
+      // close call: a car just grazed past
+      const gap = p.px < cx ? cx - p.px - 15 : p.px - (cx + c.len) - 15;
+      if (gap >= 0 && gap < 14 && !c.cc && !p.hopping) {
+        c.cc = true; shakeT = .18;
+        floaters.push({ wx: p.px, r: p.fr, txt: 'CLOSE!', t: 0 });
+        gainCheese(); sfx.close();
+      } else if (gap > 120) c.cc = false;
     }
+  }
+  if (rowC && rowC.type === 'grass' && rowC.cat && invT <= 0) {
+    if (Math.abs(p.px - rowC.cat.x) < 24 && Math.abs(p.fr - nearR) < .5) { sfx.meow(); kill('cat'); return; }
   }
   if (rowC && rowC.type === 'rail' && rowC.state === 'train' && invT <= 0) {
     const tx = rowC.trainX, tl = TILE * 3.2;
     const a = rowC.trainDir === 1 ? tx - tl : tx, b = rowC.trainDir === 1 ? tx : tx + tl;
-    if (p.px + 14 > a && p.px - 14 < b) { flingPlayer(); return; }
+    if (p.px + 14 > a && p.px - 14 < b) { flingPlayer(true); return; }
   }
 
   // camera
@@ -548,22 +721,23 @@ function update(dt) {
 
   // idle hawk
   idleTime += dt;
-  if (idleTime > 7 && !p.hopping) { spawnHawk(); kill('hawk'); return; }
+  const idleMax = currentSkin().perk === 'patient' ? 10 : 7;
+  if (idleTime > idleMax && !p.hopping) { spawnHawk(); kill('hawk'); return; }
 }
 
 function spawnHawk() { const a = projP(player.px, zOf(player.fr) + TILE * .5, 30); hawk = { x: a.x, y: a.y }; }
 
-function spawnRainbow() {
-  // drop a rainbow cheese on a walkable cell a few rows ahead
+function spawnPickup(kind) {
+  // drop a pickup on a walkable cell a few rows ahead
   for (let r = player.r + 4; r <= player.r + 12; r++) {
     genRowsUpTo(r);
     const row = rows.get(r);
-    if (!row || (row.type !== 'grass' && row.type !== 'road')) continue;
+    if (!row || (row.type !== 'grass' && row.type !== 'road') || row.pu) continue;
     const free = [];
     for (let c = 0; c < COLS; c++) if (!(row.obstacles && row.obstacles.has(c))) free.push(c);
     if (!free.length) continue;
-    row.rainbow = free[randi(0, free.length - 1)];
-    if (row.cheese) row.cheese.delete(row.rainbow);
+    row.pu = { kind, c: free[randi(0, free.length - 1)] };
+    if (row.cheese) row.cheese.delete(row.pu.c);
     return;
   }
 }
@@ -575,11 +749,14 @@ function startSewer() {
   sfx.sewer();
 }
 
-function flingPlayer() {
+function flingPlayer(fromBike) {
   const p = player;
   const col = clamp(Math.round(p.px / TILE - .5), 0, COLS - 1);
   p.hopping = false; queue.length = 0; idleTime = 0;
-  p.flung = { t: 0, fromR: p.fr, toR: p.r - 2, fromX: p.px, toX: (col + .5) * TILE };
+  // stunt perk gets flung forward instead of back
+  const dr = currentSkin().perk === 'stuntman' ? 2 : -2;
+  p.flung = { t: 0, fromR: p.fr, toR: p.r + dr, fromX: p.px, toX: (col + .5) * TILE };
+  if (fromBike) { flungRun++; if (flungRun >= 3) unlockSecret('stunt'); }
   sfx.fling();
 }
 
@@ -638,6 +815,8 @@ function draw() {
   refreshView();
   ctx.fillStyle = '#12141a';
   ctx.fillRect(0, 0, VW, H);
+  const shaking = shakeT > 0;
+  if (shaking) { ctx.save(); ctx.translate((Math.random() - .5) * shakeT * 40, (Math.random() - .5) * shakeT * 40); }
   const lo = VB.loR, hi = VB.hiR;
 
   for (let r = hi; r >= lo; r--) { // far to near
@@ -654,11 +833,55 @@ function draw() {
   }
   if (player.dead && deathType === 'splash') drawSplash();
   if (hawk) drawHawk();
+  // ghost of your best run
+  if (state === 'play' && store.d.ghost && store.d.ghost.s && store.d.ghost.s.length) {
+    const gs = store.d.ghost.s, idx = Math.min(gs.length - 1, Math.floor(runT / .08));
+    const s = gs[idx];
+    if (s[1] > camR - 2 && s[1] < camR + 22) {
+      const gskin = SKINS.find(k => k.id === store.d.ghost.skin) || SKINS[0];
+      const ga = projP(s[0], zOf(s[1]) + TILE * .5, 0);
+      ctx.save(); ctx.globalAlpha = .3; ctx.translate(ga.x, ga.y);
+      drawRatVoxel(ctx, 0, 0, gskin, s[2], 1.2, 1);
+      ctx.restore();
+    }
+  }
+  // magnet-attracted cheese in flight
+  for (const f of flying) {
+    const a0 = projP(f.wx, zOf(f.r) + TILE * .5, 12);
+    const a1 = projP(player.px, zOf(player.fr) + TILE * .5, 16);
+    const k = f.t * f.t;
+    drawCheeseIcon(ctx, a0.x + (a1.x - a0.x) * k, a0.y + (a1.y - a0.y) * k);
+  }
+  // floating text
+  for (const f of floaters) {
+    const a = projP(f.wx, zOf(f.r) + TILE * .5, 46 + f.t * 55);
+    ctx.globalAlpha = Math.max(0, 1 - f.t);
+    ctx.font = 'bold 19px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.5)';
+    ctx.strokeText(f.txt, a.x, a.y);
+    ctx.fillStyle = '#ffd94a'; ctx.fillText(f.txt, a.x, a.y);
+    ctx.globalAlpha = 1;
+  }
+  if (shaking) ctx.restore();
   // distance fog at the horizon
   const fog = ctx.createLinearGradient(0, 0, 0, 230);
   fog.addColorStop(0, 'rgba(13,15,20,.95)');
   fog.addColorStop(1, 'rgba(13,15,20,0)');
   ctx.fillStyle = fog; ctx.fillRect(0, 0, VW, 230);
+  // rain
+  if (raining) {
+    ctx.fillStyle = 'rgba(25,35,60,.16)';
+    ctx.fillRect(0, 0, VW, H);
+    ctx.strokeStyle = 'rgba(170,195,255,.28)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 70; i++) {
+      const rx = ((i * 131 + time * 520) % (VW + 160)) - 80;
+      const ry = ((i * 79 + time * 760) % (H + 60)) - 30;
+      ctx.moveTo(rx, ry); ctx.lineTo(rx - 4, ry + 16);
+    }
+    ctx.stroke();
+  }
   // level-up banner during the sewer dive
   if (state === 'sewer') {
     const a = Math.min(1, sewerT / .25) * (sewerT > 1.45 ? Math.max(0, (1.7 - sewerT) / .25) : 1);
@@ -732,13 +955,15 @@ function drawRowStuff(row) {
   if (row.type === 'grass') {
     for (const d of (row.decor || [])) drawTreeAt(d.wx, r, d.s, d.kind, true);
     if (row.cheese) for (const c of row.cheese) drawCheeseWorld((c + .5) * TILE, r);
-    if (row.rainbow !== undefined) drawRainbowWorld((row.rainbow + .5) * TILE, r);
+    if (row.pu) drawPickupWorld(row.pu.kind, (row.pu.c + .5) * TILE, r);
     for (const t of row.trees) drawTreeAt((t.c + .5) * TILE, r, t.s, t.kind, false);
+    if (row.cat) drawCat(row.cat.x, r, row.cat.dir);
   } else if (row.type === 'road') {
     if (row.cheese) for (const c of row.cheese) drawCheeseWorld((c + .5) * TILE, r);
-    if (row.rainbow !== undefined) drawRainbowWorld((row.rainbow + .5) * TILE, r);
+    if (row.pu) drawPickupWorld(row.pu.kind, (row.pu.c + .5) * TILE, r);
     for (const c of row.cars) drawCar(row, c);
   } else if (row.type === 'river') {
+    if (row.pads) drawPads(row);
     for (const l of row.logs) drawLog(row, l);
   } else if (row.type === 'rail') {
     drawSignal(row);
@@ -809,6 +1034,83 @@ function drawCheeseWorld(wx, r) {
   ctx.restore();
   const a = projP(wx, zc, 14 + b);
   drawCheeseIcon(ctx, a.x, a.y);
+}
+
+function drawPickupWorld(kind, wx, r) {
+  if (kind === 'rainbow') { drawRainbowWorld(wx, r); return; }
+  const zc = zOf(r) + TILE * .5;
+  const b = Math.sin(time * 5 + wx) * 3;
+  groundBegin();
+  ctx.fillStyle = 'rgba(0,0,0,.15)';
+  ctx.beginPath(); ctx.ellipse(wx, zc, 11, 9, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  const a = projP(wx, zc, 16 + b);
+  ctx.save(); ctx.translate(a.x, a.y);
+  if (kind === 'magnet') {
+    ctx.strokeStyle = '#d43a2f'; ctx.lineWidth = 6; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.arc(0, -2, 8, Math.PI, 0, false); ctx.stroke();
+    ctx.strokeStyle = '#eef2f8'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(-11, -2); ctx.lineTo(-11, 5); ctx.moveTo(11, -2); ctx.lineTo(11, 5); ctx.stroke();
+    ctx.lineCap = 'round';
+  } else if (kind === 'potion') {
+    ctx.fillStyle = '#8a6cdd';
+    ctx.beginPath(); ctx.roundRect(-7, -4, 14, 13, 5); ctx.fill();
+    ctx.fillStyle = '#6a4cc0'; ctx.fillRect(-3, -10, 6, 7);
+    ctx.fillStyle = '#c9a06b'; ctx.fillRect(-3.5, -13, 7, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.beginPath(); ctx.arc(-3, 1, 2, 0, 7); ctx.fill();
+  } else if (kind === 'heart') {
+    const pulse = 1 + Math.sin(time * 6) * .12;
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = 'rgba(255,217,74,.35)';
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e84360';
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.bezierCurveTo(-11, -1, -8, -10, 0, -4);
+    ctx.bezierCurveTo(8, -10, 11, -1, 0, 8);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPads(row) {
+  const zc = zOf(row.r) + TILE * .5;
+  for (const k in row.pads) {
+    const pad = row.pads[k];
+    const sub = clamp((pad.t - .45) / .7, 0, 1); // submersion
+    const wx = (+k + .5) * TILE + (pad.t > .5 ? Math.sin(time * 22) * 2.5 : 0);
+    groundBegin();
+    if (sub < 1) {
+      ctx.fillStyle = 'rgba(0,30,60,.25)';
+      ctx.beginPath(); ctx.ellipse(wx, zc + 3, 21, 17, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = sub > .4 ? '#2e7d3c' : '#3e9e4f';
+      ctx.beginPath(); ctx.ellipse(wx, zc, 20 * (1 - sub * .45), 16 * (1 - sub * .45), 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.18)';
+      ctx.beginPath(); ctx.ellipse(wx - 5, zc - 4, 7 * (1 - sub * .45), 4, 0, 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(wx, zc, 14, 11, 0, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawCat(wx, r, dir) {
+  const zc = zOf(r) + TILE * .5;
+  const hx = wx + dir * 13, tx = wx - dir * 13;
+  groundBegin();
+  ctx.fillStyle = 'rgba(0,0,0,.2)';
+  ctx.beginPath(); ctx.ellipse(wx, zc, 20, 9, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  const prowl = Math.sin(time * 7 + wx) * 1.2;
+  blockAt(ctx, ORG.x, ORG.y, wx - 12, wx + 12, zc - 7 + prowl, zc + 7 + prowl, 0, 12, '#4a4553'); // body
+  blockAt(ctx, ORG.x, ORG.y, tx - 1.5, tx + 1.5, zc - 1.5 + prowl, zc + 1.5 + prowl, 8, 11, '#4a4553'); // tail up
+  blockAt(ctx, ORG.x, ORG.y, hx - 6, hx + 6, zc - 6 + prowl, zc + 6 + prowl, 6, 10, '#4a4553'); // head
+  blockAt(ctx, ORG.x, ORG.y, hx - 5.5, hx - 2, zc - 5.5 + prowl, zc - 2 + prowl, 16, 3.5, '#4a4553'); // ears
+  blockAt(ctx, ORG.x, ORG.y, hx + 2, hx + 5.5, zc - 5.5 + prowl, zc - 2 + prowl, 16, 3.5, '#4a4553');
+  blockAt(ctx, ORG.x, ORG.y, hx + dir * 5, hx + dir * 6.5, zc - 4 + prowl, zc - 1.5 + prowl, 11, 2.5, '#c8e84a'); // eyes
+  blockAt(ctx, ORG.x, ORG.y, hx + dir * 5, hx + dir * 6.5, zc + 1.5 + prowl, zc + 4 + prowl, 11, 2.5, '#c8e84a');
 }
 
 function drawRainbowWorld(wx, r) {
@@ -927,6 +1229,10 @@ function ratPieces(skin) {
   add(13.5, 16, -7.5, -5, 9, 3, skin.eye);
   if (skin.wrinkles) add(-9, 5, -8.3, 8.3, 9, 1.5, skin.belly); // wrinkle fold
   if (skin.crown) add(7, 15, -4, 4, 14, 5, '#ffd94a');      // crown
+  if (skin.goggles) add(15.5, 17.8, -5, 5, 8.5, 3.5, '#35c4d8');  // scuba visor
+  if (skin.tank) add(-11, -5.5, -3.5, 3.5, 10, 9, '#c8cdd6');     // air tank
+  if (skin.headband) add(4.5, 17.5, -7.2, 7.2, 11.5, 2.2, '#c0392b'); // ninja band
+  if (skin.cape) add(-14, -11.5, -7, 7, 2, 13, '#d43a2f');        // stunt cape
   return P;
 }
 
@@ -1054,14 +1360,34 @@ function drawHUD() {
   }
   // cheese counter
   ctx.font = 'bold 20px Trebuchet MS, sans-serif';
-  if (invT > 0 && state === 'play') {
-    const hue = (time * 300) % 360;
-    ctx.font = 'bold 26px Trebuchet MS, sans-serif';
-    ctx.textAlign = 'center'; ctx.lineWidth = 5;
-    ctx.strokeText('★ ' + Math.ceil(invT), VW / 2, 14);
-    ctx.fillStyle = 'hsl(' + hue + ',90%,65%)';
-    ctx.fillText('★ ' + Math.ceil(invT), VW / 2, 14);
+  if (state === 'play') {
+    const badges = [];
+    if (invT > 0) badges.push(['★ ' + Math.ceil(invT), 'hsl(' + ((time * 300) % 360) + ',90%,65%)']);
+    if (magT > 0) badges.push(['🧲 ' + Math.ceil(magT), '#7fd4e2']);
+    if (slowT > 0) badges.push(['⏳ ' + Math.ceil(slowT), '#b39df5']);
+    ctx.textAlign = 'center';
+    badges.forEach((b, i) => {
+      ctx.font = 'bold 24px Trebuchet MS, sans-serif';
+      ctx.lineWidth = 5;
+      ctx.strokeText(b[0], VW / 2, 14 + i * 30);
+      ctx.fillStyle = b[1];
+      ctx.fillText(b[0], VW / 2, 14 + i * 30);
+    });
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 15px Trebuchet MS, sans-serif';
+    ctx.lineWidth = 4;
+    let ly = level > 1 ? 76 : 52;
+    if (revive > 0) {
+      ctx.strokeText('❤ second chance', 16, ly);
+      ctx.fillStyle = '#ff6b8a'; ctx.fillText('❤ second chance', 16, ly);
+      ly += 22;
+    }
+    if (daily) {
+      ctx.strokeText('DAILY RUN', 16, ly);
+      ctx.fillStyle = '#7fd4e2'; ctx.fillText('DAILY RUN', 16, ly);
+    }
     ctx.font = 'bold 20px Trebuchet MS, sans-serif';
+    ctx.lineWidth = 5;
   }
   const label = '× ' + runCheese;
   ctx.textAlign = 'right';
@@ -1073,7 +1399,11 @@ function drawHUD() {
 // ---------- game flow ----------
 const $ = id => document.getElementById(id);
 
-function startGame() {
+function startGame(isDaily) {
+  if (isDaily && store.d.dailyDone === dailyKey()) return; // one daily attempt per day
+  daily = !!isDaily;
+  const h = new Date().getHours();
+  if (h >= 0 && h < 4) unlockSecret('ninja');
   store.d.attempts++; store.save();
   recordAttempt();
   reset();
@@ -1097,13 +1427,19 @@ function endGame() {
   store.d.cheese += runCheese;
   let newBest = false;
   if (score > store.d.best) { store.d.best = score; newBest = true; }
+  // save the ghost of your best run
+  if (score > 0 && (!store.d.ghost || score >= store.d.ghost.score)) {
+    store.d.ghost = { score, skin: store.d.skin, s: ghostRec };
+  }
+  if (daily) { store.d.dailyDone = dailyKey(); store.d.dailyScore = score; }
   store.save();
   const msgs = {
-    car: 'flattened by traffic', splash: 'rats can swim... this one couldn’t', hawk: 'hawk food',
+    car: 'flattened by traffic', splash: 'rats can swim... this one couldn’t', hawk: 'hawk food', cat: 'caught by the cat',
   };
   $('deathMsg').textContent = msgs[deathType] || '';
   $('finalScore').textContent = score;
-  $('overStats').innerHTML = (newBest ? '<div class="newbest">★ NEW BEST ★</div>' : 'best ' + store.d.best) + '<br>attempt #' + store.d.attempts + ' · level ' + level + '<br>🧀 +' + runCheese + ' (total ' + store.d.cheese + ')';
+  $('overStats').innerHTML = (newBest ? '<div class="newbest">★ NEW BEST ★</div>' : 'best ' + store.d.best) + '<br>attempt #' + store.d.attempts + ' · level ' + level + (daily ? ' · <b>daily run</b>' : '') + '<br>🧀 +' + runCheese + ' (total ' + store.d.cheese + ')' + (newUnlock ? '<br>🎉 secret unlocked: <b>' + newUnlock + '</b>' : '');
+  newUnlock = null;
   $('over').classList.remove('hidden');
   showLeaderboard();
   showGlobalStats();
@@ -1131,17 +1467,19 @@ async function showLeaderboard() {
   const box = $('lb'), list = $('lbList');
   box.classList.add('hidden');
   const runId = ++lbRun;
+  const bq = daily ? LB_BOARD + (LB_BOARD ? '&' : '?') + 'day=' + dailyKey() : LB_BOARD;
+  $('lbTitle').textContent = daily ? "🏆 TODAY'S TOP RATS" : '🏆 TOP RATS';
   try {
     let top = null;
     if (store.d.name && score > 0) {
-      const res = await fetch(LB_URL + '/scores', {
+      const res = await fetch(LB_URL + '/scores' + bq, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: store.d.name, score, level }),
       });
       if (res.ok) top = (await res.json()).top;
     }
-    if (!top) top = await (await fetch(LB_URL + '/scores')).json();
+    if (!top) top = await (await fetch(LB_URL + '/scores' + bq)).json();
     if (runId !== lbRun || state !== 'dead') return;
     list.innerHTML = '';
     if (!top.length) {
@@ -1178,26 +1516,34 @@ function buildMenu() {
       .then(s => { $('stats').textContent = 'your attempts: ' + store.d.attempts + '  ·  👥 ' + s.players + ' players worldwide'; })
       .catch(() => {});
   }
+  $('dailyBtn').textContent = store.d.dailyDone === dailyKey() ? 'DAILY ✓ ' + (store.d.dailyScore || 0) : 'DAILY RUN';
   const box = $('chars'); box.innerHTML = '';
   for (const s of SKINS) {
     const unlocked = store.d.unlocked.includes(s.id);
+    const mystery = s.secret && !unlocked;
     const div = document.createElement('div');
     div.className = 'char' + (store.d.skin === s.id ? ' selected' : '') + (unlocked ? '' : ' locked');
     const pc = document.createElement('canvas');
     pc.width = 76; pc.height = 66;
     const g = pc.getContext('2d');
     g.translate(38, 34);
-    if (!unlocked) g.globalAlpha = .45;
+    if (!unlocked) g.globalAlpha = mystery ? .1 : .45;
     drawRatVoxel(g, 0, 8, s, 2, 1.15, 1);
     div.appendChild(pc);
-    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = s.name;
+    const nm = document.createElement('span'); nm.className = 'nm';
+    nm.textContent = mystery ? '???' : s.name;
     const st = document.createElement('span'); st.className = 'st';
-    st.textContent = unlocked ? (store.d.skin === s.id ? '✓ selected' : '') : '🧀 ' + s.cost;
+    st.textContent = mystery ? s.hint : unlocked ? (store.d.skin === s.id ? '✓ selected' : '') : '🧀 ' + s.cost;
     div.appendChild(nm); div.appendChild(st);
+    if (s.perk && !mystery) {
+      const pk = document.createElement('span'); pk.className = 'pk';
+      pk.textContent = PERK_TEXT[s.perk] || '';
+      div.appendChild(pk);
+    }
     div.onclick = () => {
       initAudio();
       if (unlocked) { store.d.skin = s.id; store.save(); buildMenu(); }
-      else if (store.d.cheese >= s.cost) {
+      else if (!s.secret && store.d.cheese >= s.cost) {
         store.d.cheese -= s.cost; store.d.unlocked.push(s.id); store.d.skin = s.id;
         store.save(); sfx.unlock(); buildMenu();
       } else { beep(140, .15, 'square', .06); }
@@ -1207,16 +1553,55 @@ function buildMenu() {
 }
 
 $('playBtn').onclick = () => { initAudio(); startGame(); };
+$('dailyBtn').onclick = () => { initAudio(); startGame(true); };
 $('againBtn').onclick = () => { initAudio(); startGame(); };
+$('shareBtn').onclick = () => { initAudio(); makeShareCard(); };
+
+function makeShareCard() {
+  const c = document.createElement('canvas');
+  c.width = 640; c.height = 400;
+  const g = c.getContext('2d');
+  g.fillStyle = '#171922'; g.fillRect(0, 0, 640, 400);
+  g.fillStyle = '#232838'; g.fillRect(0, 0, 640, 86);
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.font = 'bold 34px Trebuchet MS, sans-serif';
+  g.fillStyle = '#ffd94a'; g.fillText("TOMMY'S RAT ROAD", 28, 44);
+  g.font = 'bold 120px Trebuchet MS, sans-serif';
+  g.fillStyle = '#fff'; g.fillText(String(score), 28, 190);
+  g.font = 'bold 22px Trebuchet MS, sans-serif';
+  g.fillStyle = '#8fa3c8';
+  g.fillText((daily ? 'daily run · ' : '') + 'level ' + level + ' · attempt #' + store.d.attempts, 28, 262);
+  g.fillText((store.d.name ? store.d.name + ' · ' : '') + currentSkin().name, 28, 296);
+  g.font = '18px Trebuchet MS, sans-serif';
+  g.fillStyle = '#5b6580'; g.fillText('joshmcguiness.github.io/tommys-rat-road', 28, 366);
+  g.save(); g.translate(510, 250); g.scale(1, 1);
+  drawRatVoxel(g, 0, 0, currentSkin(), 2, 3.2, 1);
+  g.restore();
+  c.toBlob(b => {
+    if (!b) return;
+    const file = new File([b], 'rat-road-score.png', { type: 'image/png' });
+    const msg = 'I scored ' + score + " in Tommy's Rat Road! 🐀";
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], text: msg }).catch(() => {});
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'rat-road-score.png';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+  });
+}
 $('menuBtn').onclick = () => { state = 'menu'; $('over').classList.add('hidden'); buildMenu(); $('menu').classList.remove('hidden'); reset(); state = 'menu'; };
 
 // debug/test hook
 window.__rr = {
   fling: () => flingPlayer(),
   sewer: () => startSewer(),
-  rainbow: () => spawnRainbow(),
+  rainbow: () => spawnPickup('rainbow'),
+  pick: (k) => spawnPickup(k),
   inv: () => { invT = 10; },
-  info: () => ({ state, r: player.r, fr: player.fr, px: player.px, flung: !!player.flung, score, level, speedMul, invT, runCheese }),
+  info: () => ({ state, r: player.r, fr: player.fr, px: player.px, flung: !!player.flung, score, level, speedMul, invT, magT, slowT, revive, raining, daily, runCheese }),
 };
 
 // ---------- main loop ----------
